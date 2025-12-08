@@ -1,19 +1,26 @@
 package unitbv.mip;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import javafx.application.Application;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
-import javafx.scene.control.Label;
-import javafx.scene.control.ListView;
-import javafx.scene.control.TextField;
+import javafx.scene.control.*;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import unitbv.mip.config.PersistenceManager;
 import unitbv.mip.model.*;
+import unitbv.mip.repository.ProductRepository;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+
 
 public class RestaurantApp extends Application {
     private ObservableList<Product> productsList;
@@ -23,12 +30,23 @@ public class RestaurantApp extends Application {
     private TextField extraField;
     private Label extraLabel;
 
+
+    private final ObjectMapper mapper = new ObjectMapper();
+    private ProductRepository repository;
+
     @Override
     public void start(Stage primaryStage) {
-        productsList = FXCollections.observableArrayList(createDummyProducts());
+        repository = new ProductRepository();
+
+        List<Product> dbProducts = repository.getAllProducts();
+
+        productsList = FXCollections.observableArrayList(dbProducts);
 
         BorderPane root = new BorderPane();
         root.setPadding(new Insets(10));
+
+        MenuBar menuBar = createMenuBar(primaryStage);
+        root.setTop(menuBar);
 
         ListView<Product> listView = new ListView<>(productsList);
         listView.setPrefWidth(200);
@@ -43,15 +61,103 @@ public class RestaurantApp extends Application {
                     if (oldProduct != null) {
                         unbindProductFromForm(oldProduct);
                     }
-
-                    if(newProduct != null)
+                    if (newProduct != null) {
                         bindProductToForm(newProduct);
+                    }
                 });
 
-        Scene scene = new Scene(root,800,600);
+        Scene scene = new Scene(root, 800, 600);
         primaryStage.setTitle("Meniu Restaurant 'La Andrei'");
         primaryStage.setScene(scene);
         primaryStage.show();
+    }
+
+    private MenuBar createMenuBar(Stage stage) {
+        MenuBar menuBar = new MenuBar();
+        Menu fileMenu = new Menu("File");
+
+        MenuItem exportItem = new MenuItem("Export JSON");
+        exportItem.setOnAction(e -> exportToJson(stage));
+
+        MenuItem importItem = new MenuItem("Import JSON");
+        importItem.setOnAction(e -> importFromJson(stage));
+
+        fileMenu.getItems().addAll(exportItem, importItem);
+        menuBar.getMenus().add(fileMenu);
+        return menuBar;
+    }
+
+    private void exportToJson(Stage stage) {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Salvează Meniul");
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("JSON Files", "*.json"));
+
+        File file = fileChooser.showSaveDialog(stage);
+        if (file != null) {
+            try {
+
+                mapper.writerFor(new com.fasterxml.jackson.core.type.TypeReference<List<Product>>() {})
+                        .withDefaultPrettyPrinter()
+                        .writeValue(file, new ArrayList<>(productsList)); // forteaza json sa respect adnotarile de pe parinte
+
+                System.out.println("Export reusit in: " + file.getAbsolutePath());
+            } catch (IOException e) {
+                e.printStackTrace();
+                //showAlert("Eroare Export", "Nu s-a putut salva fișierul: " + e.getMessage());
+            }
+        }
+    }
+
+    private void importFromJson(Stage stage) {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Încarcă Meniu");
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("JSON Files", "*.json"));
+
+        File file = fileChooser.showOpenDialog(stage);
+        if (file != null) {
+            try {
+                List<Product> importedProducts = mapper.readValue(file, new TypeReference<List<Product>>() {});
+
+                int addedCount = 0;
+                int skippedCount = 0;
+
+                for (Product p : importedProducts) {
+                    Product existingProduct = repository.findByName(p.getName()); // verif duplicate
+
+                    if (existingProduct == null) {
+                        // nu exista - adaug
+                        p.setId(null); // resetam id-ul pentru a crea o noua intrare in baza de date
+                        repository.addProduct(p);
+                        addedCount++;
+                    } else {
+                        // Exista deja - sar
+                        System.out.println("Produsul '" + p.getName() + "' există deja. Ignorat.");
+                        skippedCount++;
+                    }
+                }
+
+                // reincarc tabelul
+                productsList.setAll(repository.getAllProducts());
+
+                String msg = String.format("Import finalizat.\nAdăugate: %d\nIgnorate (duplicate): %d", addedCount, skippedCount);
+
+                System.out.println(msg);
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("Rezultat Import");
+                alert.setHeaderText(null);
+                alert.setContentText(msg);
+                alert.showAndWait();
+
+            } catch (IOException e) {
+                e.printStackTrace();
+                //showAlert("Eroare Import", "Fișier corupt sau format invalid: " + e.getMessage());
+            }
+        }
+    }
+
+    @Override
+    public void stop() {
+        PersistenceManager.getInstance().close();
     }
 
     private void bindProductToForm(Product product) {
@@ -104,29 +210,6 @@ public class RestaurantApp extends Application {
         );
 
         return box;
-    }
-
-    private List<Product> createDummyProducts() {
-        return List.of(
-                new Food("Carne de pui", 25.5, 350, Category.FELURI_PRINCIPALE, false),
-        new Food("Paste Bolognese", 28.0, 300, Category.FELURI_PRINCIPALE, false),
-        new Food("Pizza Margherita", 35.0, 400, Category.FELURI_PRINCIPALE, true),
-        new Food("Salată Caesar", 30.0, 250, Category.APERITIVE, false),
-        new Food("Lava Cake", 20.0, 150, Category.DESERTURI, true),
-
-        new Drink("Apă", 9.0, 0.5, false),
-        new Drink("Suc de portocale", 12.0, 0.33, false),
-        new Drink("Bere", 10.0, 0.5, true),
-
-        new Pizza.PizzaBuilder("Pufos", "Dulce", 20.0)
-                .withName("Pizza Casei")
-                .addTopping("Mozzarella", 5.0, 50, false)
-                .addTopping("Bacon", 6.0, 40, true)
-                .addTopping("Ciuperci", 3.0, 30, false)
-                .build()
-        );
-
-
     }
 
     public static void main(String[] args) {

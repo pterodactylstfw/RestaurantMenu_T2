@@ -82,13 +82,6 @@ public class Main {
         products.add(new Drink("Suc de portocale", 12.0, 0.33, false));
         products.add(new Drink("Bere", 10.0, 0.5, true));
 
-        Product customPizza = new Pizza.PizzaBuilder("Pufos", "Dulce", 20.0)
-                .withName("Pizza Casei")
-                .addTopping("Mozzarella", 5.0, 50, false)
-                .addTopping("Bacon", 6.0, 40, true)
-                .addTopping("Ciuperci", 3.0, 30, false)
-                .build();
-        products.add(customPizza);
 
         return products;
     }

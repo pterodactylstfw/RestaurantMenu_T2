@@ -14,7 +14,7 @@ public final class DiscountStrategies {
             Product product = item.getProduct();
             int quantity = item.getQuantity();
 
-            if ((product instanceof Drink) && ((Drink) product).isIsAlcoholic()) {
+            if ((product instanceof Drink) && ((Drink) product).isAlcoholic()) {
                 finalSubtotal += product.getPrice() * quantity * 0.8;
             } else {
                 finalSubtotal += item.getSubtotalNet();

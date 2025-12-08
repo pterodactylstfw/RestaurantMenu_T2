@@ -24,7 +24,7 @@ public class Menu {
                 .flatMap(List::stream)
                 .filter(f -> f instanceof Food)
                 .map(f -> (Food) f)
-                .filter(Food::isIsVegetarian)
+                .filter(Food::isVegetarian)
                 .sorted(Comparator.comparing(Product::getName))
                 .collect(Collectors.toList());
     }

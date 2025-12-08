@@ -1,10 +1,14 @@
 <persistence xmlns="https://jakarta.ee/xml/ns/persistence" version="3.0">
     <persistence-unit name="RestaurantPU">
         <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
+        <class>unitbv.mip.model.Product</class>
+        <class>unitbv.mip.model.Food</class>
+        <class>unitbv.mip.model.Drink</class>
+
             <properties>
 
             <property name="jakarta.persistence.jdbc.url"
-                      value="jdbc:postgresql://localhost:5432/biblioteca_db"/>
+                      value="jdbc:postgresql://localhost:5432/restaurant_db"/>
             <property name="jakarta.persistence.jdbc.user"
                       value="postgres"/>
             <property name="jakarta.persistence.jdbc.password"
@@ -18,5 +22,6 @@
 
             <property name="hibernate.hbm2ddl.auto" value="update"/>
             </properties>
+
     </persistence-unit>
 </persistence>
