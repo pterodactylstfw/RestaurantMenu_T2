@@ -1,12 +1,24 @@
 package unitbv.mip.model;
 
+import jakarta.persistence.*;
+
 import java.util.ArrayList;
 import java.util.List;
 
+@Entity
+@DiscriminatorValue("PIZZA")
 public final class Pizza extends Food {
-    private final String crust;
-    private final String sauce;
-    private final List<String> toppings;
+    private String crust;
+    private String sauce;
+
+    @ElementCollection(fetch = FetchType.EAGER) // incarcam topping-urile impreuna cu pizza
+    @CollectionTable(name = "pizza_toppings", joinColumns = @JoinColumn(name = "pizza_id"))
+    @Column(name = "topping_name")
+    private List<String> toppings = new ArrayList<>();
+
+    public Pizza() {
+        super();
+    }
 
     // Constructorul privat
     private Pizza(String name, double price, double weight, boolean isVegetarian,
@@ -18,17 +30,23 @@ public final class Pizza extends Food {
         this.toppings = toppings;
     }
 
+    @Column
     public String getCrust() {
         return crust;
     }
+    public void setCrust(String crust) { this.crust = crust; }
 
+    @Column
     public String getSauce() {
         return sauce;
     }
+    public void setSauce(String sauce) { this.sauce = sauce; }
 
+    @Column
     public List<String> getToppings() {
         return new ArrayList<>(toppings);
     }
+    public void setToppings(List<String> toppings) {this.toppings = new ArrayList<>(toppings);}
 
 //    @Override
 //    public String toString() {

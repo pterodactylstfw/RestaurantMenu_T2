@@ -4,6 +4,11 @@
         <class>unitbv.mip.model.Product</class>
         <class>unitbv.mip.model.Food</class>
         <class>unitbv.mip.model.Drink</class>
+        <class>unitbv.mip.model.User</class>
+        <class>unitbv.mip.model.RestaurantTable</class>
+        <class>unitbv.mip.model.Order</class>
+        <class>unitbv.mip.model.Pizza</class>
+        <class>unitbv.mip.model.OrderItem</class>
 
             <properties>
 
