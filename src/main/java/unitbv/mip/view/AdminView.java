@@ -1,43 +1,70 @@
 package unitbv.mip.view;
 
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import unitbv.mip.model.Order;
 import unitbv.mip.model.User;
 
-public class AdminView extends TabPane {
+public class AdminView extends StackPane {
+
+    private TabPane tabPane;
+    private ProgressIndicator loadingSpinner;
+    private VBox loadingOverlay;
 
     private TableView<User> staffTable;
     private TextField usernameField;
     private PasswordField passwordField;
-    private Button addStaffButton, deleteStaffButton, editProductButton;
+    private Button addStaffButton, deleteStaffButton;
 
     private MenuTableView menuTable;
-    private Button deleteProductButton;
+    private Button deleteProductButton, editProductButton;
     private Button importJsonButton, exportJsonButton;
 
     private CheckBox happyHourCheck, mealDealCheck, partyPackCheck;
     private Button saveOffersButton;
 
     private TableView<Order> globalHistoryTable;
+    private Button refreshHistoryButton;
 
     private Button logoutButton;
 
     public AdminView() {
-        this.setTabClosingPolicy(TabClosingPolicy.UNAVAILABLE);
+
+        this.setPadding(new Insets(0));
+
+        tabPane = new TabPane();
+        tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 
         logoutButton = new Button("Deconectare");
+        logoutButton.setStyle("-fx-background-color: #ff4444; -fx-text-fill: white;");
 
         createStaffTab();
         createMenuTab();
         createOffersTab();
         createHistoryTab();
 
+        loadingSpinner = new ProgressIndicator();
+        Label loadingLabel = new Label("Se procesează datele...");
+        loadingLabel.setStyle("-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 14px;");
 
+        loadingOverlay = new VBox(10, loadingSpinner, loadingLabel);
+        loadingOverlay.setAlignment(Pos.CENTER);
+        loadingOverlay.setStyle("-fx-background-color: rgba(0, 0, 0, 0.5);");
+        loadingOverlay.setVisible(false);
+
+        this.getChildren().addAll(tabPane, loadingOverlay);
+
+    }
+
+    public void setLoading(boolean isLoading) {
+        loadingOverlay.setVisible(isLoading);
+        tabPane.setDisable(isLoading);
     }
 
     private void createStaffTab() {
@@ -62,7 +89,7 @@ public class AdminView extends TabPane {
 
         content.getChildren().addAll(form, new Separator(), staffTable, deleteStaffButton);
         tab.setContent(content);
-        this.getTabs().add(tab);
+        tabPane.getTabs().add(tab);
     }
 
     private void createMenuTab() {
@@ -84,7 +111,7 @@ public class AdminView extends TabPane {
         content.setBottom(controls);
 
         tab.setContent(content);
-        this.getTabs().add(tab);
+        tabPane.getTabs().add(tab);
     }
 
     private void createOffersTab() {
@@ -102,7 +129,7 @@ public class AdminView extends TabPane {
                 happyHourCheck, mealDealCheck, partyPackCheck,
                 new Separator(), saveOffersButton);
         tab.setContent(content);
-        this.getTabs().add(tab);
+        tabPane.getTabs().add(tab);
     }
 
     private void createHistoryTab() {
@@ -110,24 +137,25 @@ public class AdminView extends TabPane {
         VBox content = new VBox(10);
         content.setPadding(new Insets(15));
 
-        content.getChildren().add(logoutButton);
+        HBox topBar = new HBox(10);
+        refreshHistoryButton = new Button("Reîncarcă Istoric");
+        topBar.getChildren().addAll(logoutButton, new Separator(), refreshHistoryButton);
 
         globalHistoryTable = new TableView<>();
         TableColumn<Order, Long> idCol = new TableColumn<>("ID");
         idCol.setCellValueFactory(new PropertyValueFactory<>("id"));
-
-        TableColumn<Order, Double> totalCol = new TableColumn<>("Total");
+        TableColumn<Order, Double> totalCol = new TableColumn<>("Total (RON)");
         totalCol.setCellValueFactory(new PropertyValueFactory<>("totalAmount"));
 
         globalHistoryTable.getColumns().addAll(idCol, totalCol);
         globalHistoryTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
-        content.getChildren().add(globalHistoryTable);
+        content.getChildren().addAll(topBar, globalHistoryTable);
         tab.setContent(content);
-        this.getTabs().add(tab);
+        tabPane.getTabs().add(tab);
     }
 
-    // --- Getters ---
+    public Button getRefreshHistoryButton() { return refreshHistoryButton; }
     public TableView<User> getStaffTable() { return staffTable; }
     public TextField getUsernameField() { return usernameField; }
     public PasswordField getPasswordField() { return passwordField; }

@@ -3,11 +3,13 @@ package unitbv.mip.controller;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import javafx.collections.FXCollections;
+import javafx.concurrent.Task;
 import javafx.scene.control.*;
 
 import javafx.scene.layout.GridPane;
 import javafx.stage.FileChooser;
 import unitbv.mip.config.ConfigManager;
+import unitbv.mip.model.Order;
 import unitbv.mip.model.Product;
 import unitbv.mip.model.Role;
 import unitbv.mip.model.User;
@@ -25,6 +27,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class AdminController {
 
@@ -34,16 +38,24 @@ public class AdminController {
     private final OrderRepository orderRepository;
     private final MenuService menuService;
 
+    private final ExecutorService executorService;
+
     public AdminController(AdminView view) {
         this.view = view;
         this.userRepository = new UserRepository();
         this.productRepository = new ProductRepository();
         this.orderRepository = new OrderRepository();
         this.menuService = new MenuService();
+        this.executorService = Executors.newSingleThreadExecutor();
 
-        refreshAllData();
+        refreshLightData();
         attachListeners();
         loadOfferState();
+    }
+
+    private void refreshLightData() {
+        view.getStaffTable().setItems(FXCollections.observableArrayList(userRepository.findAllStaff()));
+        view.getMenuTable().setItems(FXCollections.observableArrayList(productRepository.getAllProducts()));
     }
 
     private void refreshAllData() {
@@ -55,11 +67,11 @@ public class AdminController {
     private void attachListeners() {
         view.getAddStaffButton().setOnAction(e -> addStaff());
         view.getDeleteStaffButton().setOnAction(e -> deleteStaff());
-
+        view.getRefreshHistoryButton().setOnAction(e -> loadHistoryAsync());
         view.getDeleteProductButton().setOnAction(e -> deleteProduct());
         view.getEditProductButton().setOnAction(e -> editProduct());
         view.getExportJsonButton().setOnAction(e -> exportJson());
-        view.getImportJsonButton().setOnAction(e -> importJson());
+        view.getImportJsonButton().setOnAction(e -> importJsonAsync());
 
         view.getSaveOffersButton().setOnAction(e -> saveOffers());
 
@@ -69,6 +81,86 @@ public class AdminController {
             new LoginController(loginView);
             SceneManager.getInstance().changeScene(loginView, "Autentificare");
         });
+    }
+
+    private void importJsonAsync() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Importă Meniu din JSON");
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("JSON Files", "*.json"));
+        File file = fileChooser.showOpenDialog(view.getScene().getWindow());
+
+        if (file == null) return;
+
+        view.setLoading(true);
+
+        Task<String> task = new Task<>() {
+            @Override
+            protected String call() throws Exception {
+                ObjectMapper mapper = new ObjectMapper();
+                List<Product> importedProducts = mapper.readValue(file, new TypeReference<List<Product>>() {});
+
+                int addedCount = 0;
+                int skippedCount = 0;
+
+                Thread.sleep(1000);
+
+                for (Product p : importedProducts) {
+                    if (productRepository.findByName(p.getName()).isPresent()) {
+                        skippedCount++;
+                    } else {
+                        p.setId(null);
+                        productRepository.addProduct(p);
+                        addedCount++;
+                    }
+                }
+                return String.format("Import finalizat!\n\nProduse noi: %d\nDuplicate ignorate: %d", addedCount, skippedCount);
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            refreshLightData();
+            view.setLoading(false);
+            showAlert("Raport Import", task.getValue());
+        });
+
+        task.setOnFailed(e -> {
+            view.setLoading(false);
+            showAlert("Eroare Import", "Fișier invalid sau corupt.");
+            task.getException().printStackTrace();
+        });
+
+        executorService.submit(task);
+    }
+
+    public void shutdown() {
+        executorService.shutdown();
+    }
+
+
+    private void loadHistoryAsync() {
+        view.setLoading(true);
+
+        Task<List<Order>> task = new Task<>() {
+            @Override
+            protected List<Order> call() throws Exception {
+                Thread.sleep(1500);
+
+                return orderRepository.findAll();
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            view.getGlobalHistoryTable().setItems(FXCollections.observableArrayList(task.getValue()));
+            view.setLoading(false);
+        });
+
+        task.setOnFailed(e -> {
+            view.setLoading(false);
+            showAlert("Eroare", "Nu s-a putut încărca istoricul.");
+            task.getException().printStackTrace();
+        });
+
+        executorService.submit(task);
     }
 
     private void editProduct() {
