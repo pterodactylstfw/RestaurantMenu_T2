@@ -8,11 +8,12 @@ import org.hibernate.annotations.Proxy;
 
 @Entity
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
-@DiscriminatorColumn(name = "product_type")
+@DiscriminatorColumn(name = "product_type", discriminatorType = DiscriminatorType.STRING)
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
 @JsonSubTypes({
         @JsonSubTypes.Type(value = Food.class, name = "food"),
-        @JsonSubTypes.Type(value = Drink.class, name = "drink")
+        @JsonSubTypes.Type(value = Drink.class, name = "drink"),
+        @JsonSubTypes.Type(value = Pizza.class, name = "pizza")
 })
 @Proxy(lazy = false)
 public sealed abstract class Product permits Food, Drink {
@@ -22,6 +23,7 @@ public sealed abstract class Product permits Food, Drink {
     private StringProperty name;
     private DoubleProperty price;
     private ObjectProperty<Category> category;
+
 
     public Product(String name, double price, Category category) {
         this.name = new SimpleStringProperty(name);
@@ -38,7 +40,6 @@ public sealed abstract class Product permits Food, Drink {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     public Long getId() {return id;}
-
     public void setId(Long id) {this.id = id;}
 
     @Column
