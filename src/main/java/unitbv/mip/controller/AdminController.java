@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import javafx.collections.FXCollections;
 import javafx.concurrent.Task;
 import javafx.scene.control.*;
-
 import javafx.scene.layout.GridPane;
 import javafx.stage.FileChooser;
 import unitbv.mip.config.ConfigManager;
@@ -65,16 +64,30 @@ public class AdminController {
     }
 
     private void attachListeners() {
+        // --- STAFF LISTENERS ---
         view.getAddStaffButton().setOnAction(e -> addStaff());
         view.getDeleteStaffButton().setOnAction(e -> deleteStaff());
+
+        // Listener pentru dublu-click pe tabelul de staff pentru EDITARE
+        view.getStaffTable().setOnMouseClicked(event -> {
+            if (event.getClickCount() == 2 && view.getStaffTable().getSelectionModel().getSelectedItem() != null) {
+                editStaff();
+            }
+        });
+
+        // --- HISTORY LISTENERS ---
         view.getRefreshHistoryButton().setOnAction(e -> loadHistoryAsync());
+
+        // --- MENU LISTENERS ---
         view.getDeleteProductButton().setOnAction(e -> deleteProduct());
         view.getEditProductButton().setOnAction(e -> editProduct());
         view.getExportJsonButton().setOnAction(e -> exportJson());
         view.getImportJsonButton().setOnAction(e -> importJsonAsync());
 
+        // --- OFFERS LISTENERS ---
         view.getSaveOffersButton().setOnAction(e -> saveOffers());
 
+        // --- GENERAL LISTENERS ---
         view.getLogoutButton().setOnAction(e -> {
             new AuthService().logout();
             LoginView loginView = new LoginView();
@@ -83,84 +96,112 @@ public class AdminController {
         });
     }
 
-    private void importJsonAsync() {
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Importă Meniu din JSON");
-        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("JSON Files", "*.json"));
-        File file = fileChooser.showOpenDialog(view.getScene().getWindow());
+    // --- METODE STAFF (USER) ---
 
-        if (file == null) return;
+    private void addStaff() {
+        String user = view.getUsernameField().getText();
+        String pass = view.getPasswordField().getText();
+        if (user.isEmpty() || pass.isEmpty()) return;
 
-        view.setLoading(true);
+        User newUser = new User();
+        newUser.setUsername(user);
+        newUser.setPassword(pass);
+        newUser.setRole(Role.STAFF);
 
-        Task<String> task = new Task<>() {
-            @Override
-            protected String call() throws Exception {
-                ObjectMapper mapper = new ObjectMapper();
-                List<Product> importedProducts = mapper.readValue(file, new TypeReference<List<Product>>() {});
+        userRepository.save(newUser);
+        view.getUsernameField().clear();
+        view.getPasswordField().clear();
+        refreshAllData();
+    }
 
-                int addedCount = 0;
-                int skippedCount = 0;
+    private void editStaff() {
+        User selected = view.getStaffTable().getSelectionModel().getSelectedItem();
+        if (selected == null) return;
 
-                Thread.sleep(1000);
+        Dialog<User> dialog = new Dialog<>();
+        dialog.setTitle("Editare Angajat");
+        dialog.setHeaderText("Modifică datele pentru: " + selected.getUsername());
 
-                for (Product p : importedProducts) {
-                    if (productRepository.findByName(p.getName()).isPresent()) {
-                        skippedCount++;
-                    } else {
-                        p.setId(null);
-                        productRepository.addProduct(p);
-                        addedCount++;
-                    }
+        ButtonType saveButtonType = new ButtonType("Salvează", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(saveButtonType, ButtonType.CANCEL);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new javafx.geometry.Insets(20, 150, 10, 10));
+
+        TextField usernameField = new TextField(selected.getUsername());
+        PasswordField passwordField = new PasswordField();
+        passwordField.setPromptText("Lasă gol pt a nu schimba");
+
+        grid.add(new Label("Username:"), 0, 0);
+        grid.add(usernameField, 1, 0);
+        grid.add(new Label("Parolă Nouă:"), 0, 1);
+        grid.add(passwordField, 1, 1);
+
+        dialog.getDialogPane().setContent(grid);
+
+        dialog.setResultConverter(dialogButton -> {
+            if (dialogButton == saveButtonType) {
+                selected.setUsername(usernameField.getText());
+                // Schimbăm parola doar dacă a scris ceva în câmp
+                if (!passwordField.getText().isEmpty()) {
+                    selected.setPassword(passwordField.getText());
                 }
-                return String.format("Import finalizat!\n\nProduse noi: %d\nDuplicate ignorate: %d", addedCount, skippedCount);
+                return selected;
             }
-        };
-
-        task.setOnSucceeded(e -> {
-            refreshLightData();
-            view.setLoading(false);
-            showAlert("Raport Import", task.getValue());
+            return null;
         });
 
-        task.setOnFailed(e -> {
-            view.setLoading(false);
-            showAlert("Eroare Import", "Fișier invalid sau corupt.");
-            task.getException().printStackTrace();
-        });
+        Optional<User> result = dialog.showAndWait();
 
-        executorService.submit(task);
+        result.ifPresent(user -> {
+            // Asigură-te că ai metoda update în UserRepository (folosind em.merge)
+            // Dacă nu o ai, adaug-o similar cu updateProduct
+            userRepository.update(user);
+            refreshAllData();
+            showAlert("Succes", "Datele angajatului au fost actualizate!");
+        });
     }
 
-    public void shutdown() {
-        executorService.shutdown();
+    private void deleteStaff() {
+        User selected = view.getStaffTable().getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showAlert("Atenție", "Selectați un angajat pentru ștergere.");
+            return;
+        }
+
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Confirmare Ștergere");
+        alert.setHeaderText("Sunteți sigur că vreți să concediați angajatul " + selected.getUsername() + "?");
+        alert.setContentText("ATENȚIE: Toate comenzile asociate acestui ospătar vor fi șterse definitiv din istoric!");
+
+        Optional<ButtonType> result = alert.showAndWait();
+        if (result.isPresent() && result.get() == ButtonType.OK) {
+            // --- MODIFICARE PENTRU ȘTERGERE CASCADE ---
+            // 1. Găsim și ștergem comenzile ospătarului manual pentru a evita eroarea de Foreign Key
+            List<Order> allOrders = orderRepository.findAll();
+            for (Order o : allOrders) {
+                if (o.getWaiter() != null && o.getWaiter().getId().equals(selected.getId())) {
+                    orderRepository.delete(o);
+                }
+            }
+
+            // 2. Acum putem șterge ospătarul
+            userRepository.delete(selected);
+            refreshAllData();
+            showAlert("Succes", "Angajatul și istoricul său au fost șterse.");
+        }
     }
 
+    // --- METODE PRODUS (MENU) ---
 
-    private void loadHistoryAsync() {
-        view.setLoading(true);
-
-        Task<List<Order>> task = new Task<>() {
-            @Override
-            protected List<Order> call() throws Exception {
-                Thread.sleep(1500);
-
-                return orderRepository.findAll();
-            }
-        };
-
-        task.setOnSucceeded(e -> {
-            view.getGlobalHistoryTable().setItems(FXCollections.observableArrayList(task.getValue()));
-            view.setLoading(false);
-        });
-
-        task.setOnFailed(e -> {
-            view.setLoading(false);
-            showAlert("Eroare", "Nu s-a putut încărca istoricul.");
-            task.getException().printStackTrace();
-        });
-
-        executorService.submit(task);
+    private void deleteProduct() {
+        Product selected = view.getMenuTable().getSelectionModel().getSelectedItem();
+        if (selected != null) {
+            productRepository.delete(selected);
+            refreshAllData();
+        }
     }
 
     private void editProduct() {
@@ -229,70 +270,13 @@ public class AdminController {
             return null;
         });
 
-        java.util.Optional<Product> result = dialog.showAndWait();
+        Optional<Product> result = dialog.showAndWait();
 
         result.ifPresent(product -> {
             productRepository.updateProduct(product);
             refreshAllData();
             showAlert("Succes", "Produsul a fost actualizat!");
         });
-    }
-
-    private void addStaff() {
-        String user = view.getUsernameField().getText();
-        String pass = view.getPasswordField().getText();
-        if (user.isEmpty() || pass.isEmpty()) return;
-
-        User newUser = new User();
-        newUser.setUsername(user);
-        newUser.setPassword(pass);
-        newUser.setRole(Role.STAFF);
-
-        userRepository.save(newUser);
-        view.getUsernameField().clear();
-        view.getPasswordField().clear();
-        refreshAllData();
-    }
-
-    private void deleteStaff() {
-        User selected = view.getStaffTable().getSelectionModel().getSelectedItem();
-        if (selected == null) {
-            showAlert("Atenție", "Selectați un angajat pentru ștergere.");
-            return;
-        }
-
-        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-        alert.setTitle("Confirmare Ștergere");
-        alert.setHeaderText("Sunteți sigur că vreți să concediați angajatul " + selected.getUsername() + "?");
-        alert.setContentText("ATENȚIE: Toate comenzile asociate acestui ospătar vor fi șterse definitiv din istoric!");
-
-        Optional<ButtonType> result = alert.showAndWait();
-        if (result.isPresent() && result.get() == ButtonType.OK) {
-            userRepository.delete(selected);
-            refreshAllData();
-        }
-    }
-
-    private void deleteProduct() {
-        Product selected = view.getMenuTable().getSelectionModel().getSelectedItem();
-        if (selected != null) {
-            productRepository.delete(selected);
-            refreshAllData();
-        }
-    }
-
-    private void saveOffers() {
-        DiscountStrategies.HAPPY_HOUR_ACTIVE = view.getHappyHourCheck().isSelected();
-        DiscountStrategies.MEAL_DEAL_ACTIVE = view.getMealDealCheck().isSelected();
-        DiscountStrategies.PARTY_PACK_ACTIVE = view.getPartyPackCheck().isSelected();
-        ConfigManager.saveCurrentState();
-        showAlert("Succes", "Regulile au fost actualizate și salvate!");
-    }
-
-    private void loadOfferState() {
-        view.getHappyHourCheck().setSelected(DiscountStrategies.HAPPY_HOUR_ACTIVE);
-        view.getMealDealCheck().setSelected(DiscountStrategies.MEAL_DEAL_ACTIVE);
-        view.getPartyPackCheck().setSelected(DiscountStrategies.PARTY_PACK_ACTIVE);
     }
 
     private void exportJson() {
@@ -321,44 +305,96 @@ public class AdminController {
         }
     }
 
-    private void importJson() {
+    private void importJsonAsync() {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Importă Meniu din JSON");
         fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("JSON Files", "*.json"));
-
         File file = fileChooser.showOpenDialog(view.getScene().getWindow());
 
-        if (file != null) {
-            ObjectMapper mapper = new ObjectMapper();
+        if (file == null) return;
 
-            try {
+        view.setLoading(true);
+
+        Task<String> task = new Task<>() {
+            @Override
+            protected String call() throws Exception {
+                ObjectMapper mapper = new ObjectMapper();
                 List<Product> importedProducts = mapper.readValue(file, new TypeReference<List<Product>>() {});
 
                 int addedCount = 0;
                 int skippedCount = 0;
 
+                Thread.sleep(1000);
+
                 for (Product p : importedProducts) {
                     if (productRepository.findByName(p.getName()).isPresent()) {
-                        System.out.println("Produsul '" + p.getName() + "' există deja. Se sare.");
                         skippedCount++;
-                        continue;
+                    } else {
+                        p.setId(null);
+                        productRepository.addProduct(p);
+                        addedCount++;
                     }
-
-                    p.setId(null);
-                    productRepository.addProduct(p);
-                    addedCount++;
                 }
-
-                refreshAllData();
-
-                String message = String.format("Import finalizat!\n\nProduse noi adăugate: %d\nDuplicate ignorate: %d", addedCount, skippedCount);
-                showAlert("Raport Import", message);
-
-            } catch (IOException e) {
-                e.printStackTrace();
-                showAlert("Eroare Import", "Fișierul este corupt sau invalid.\n" + e.getMessage());
+                return String.format("Import finalizat!\n\nProduse noi: %d\nDuplicate ignorate: %d", addedCount, skippedCount);
             }
-        }
+        };
+
+        task.setOnSucceeded(e -> {
+            refreshLightData();
+            view.setLoading(false);
+            showAlert("Raport Import", task.getValue());
+        });
+
+        task.setOnFailed(e -> {
+            view.setLoading(false);
+            showAlert("Eroare Import", "Fișier invalid sau corupt.");
+            task.getException().printStackTrace();
+        });
+
+        executorService.submit(task);
+    }
+
+    // --- METODE ISTORIC ---
+
+    private void loadHistoryAsync() {
+        view.setLoading(true);
+
+        Task<List<Order>> task = new Task<>() {
+            @Override
+            protected List<Order> call() throws Exception {
+                Thread.sleep(1500);
+                return orderRepository.findAll();
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            view.getGlobalHistoryTable().setItems(FXCollections.observableArrayList(task.getValue()));
+            view.setLoading(false);
+        });
+
+        task.setOnFailed(e -> {
+            view.setLoading(false);
+            showAlert("Eroare", "Nu s-a putut încărca istoricul.");
+            task.getException().printStackTrace();
+        });
+
+        executorService.submit(task);
+    }
+
+    // --- METODE OFERTE ---
+
+    private void saveOffers() {
+        DiscountStrategies.HAPPY_HOUR_ACTIVE = view.getHappyHourCheck().isSelected();
+        DiscountStrategies.MEAL_DEAL_ACTIVE = view.getMealDealCheck().isSelected();
+        DiscountStrategies.PARTY_PACK_ACTIVE = view.getPartyPackCheck().isSelected();
+        ConfigManager.saveCurrentState();
+        showAlert("Succes", "Regulile au fost actualizate și salvate!");
+    }
+
+    private void loadOfferState() {
+        view.getHappyHourCheck().setSelected(DiscountStrategies.HAPPY_HOUR_ACTIVE);
+        view.getMealDealCheck().setSelected(DiscountStrategies.MEAL_DEAL_ACTIVE);
+        view.getPartyPackCheck().setSelected(DiscountStrategies.PARTY_PACK_ACTIVE);
     }
 
     private void showAlert(String title, String content) {
@@ -367,5 +403,9 @@ public class AdminController {
         alert.setHeaderText(null);
         alert.setContentText(content);
         alert.showAndWait();
+    }
+
+    public void shutdown() {
+        executorService.shutdown();
     }
 }

@@ -54,4 +54,21 @@ public class OrderRepository {
             em.close();
         }
     }
+
+    public void delete(Order o) {
+        EntityManager em = getEntityManager();
+        try {
+            em.getTransaction().begin();
+            Order managedOrder = em.merge(o);
+            em.remove(managedOrder);
+            em.getTransaction().commit();
+        } catch (Exception e) {
+            if (em.getTransaction().isActive()) {
+                em.getTransaction().rollback();
+            }
+            throw new RuntimeException("Eroare la ștergerea comenzii", e);
+        } finally {
+            em.close();
+        }
+    }
 }

@@ -1,6 +1,7 @@
 package unitbv.mip;
 
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.stage.Stage;
 import unitbv.mip.config.ConfigManager; // Import nou
 import unitbv.mip.config.PersistenceManager;
@@ -27,11 +28,19 @@ public class RestaurantApp extends Application {
         new LoginController(loginView);
 
         SceneManager.getInstance().changeScene(loginView, "Autentificare - La Andrei");
+
+        primaryStage.setOnCloseRequest(event -> {
+            System.out.println("S-a apăsat X. Inițiere oprire...");
+            Platform.exit();
+        });
     }
 
     @Override
-    public void stop() {
+    public void stop() throws Exception {
         PersistenceManager.getInstance().close();
+        super.stop();
+        System.out.println("Aplicația se oprește. Curățare resurse...");
+        System.exit(0);
     }
 
     public static void main(String[] args) {

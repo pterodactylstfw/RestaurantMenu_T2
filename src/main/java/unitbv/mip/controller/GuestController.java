@@ -1,5 +1,6 @@
 package unitbv.mip.controller;
 
+import javafx.collections.FXCollections;
 import unitbv.mip.model.Drink;
 import unitbv.mip.model.Food;
 import unitbv.mip.model.Pizza;
@@ -37,7 +38,8 @@ public class GuestController {
         view.getSearchField().textProperty().addListener((obs, old, nev) -> applyFilters());
         view.getVegCheckBox().selectedProperty().addListener((obs, old, nev) -> applyFilters());
         view.getTypeFilter().valueProperty().addListener((obs, old, nev) -> applyFilters());
-
+        view.getMinPriceField().textProperty().addListener(obs -> applyFilters());
+        view.getMaxPriceField().textProperty().addListener(obs -> applyFilters());
         view.getBackButton().setOnAction(e -> {
             LoginView loginView = new LoginView();
             new LoginController(loginView);
@@ -62,7 +64,7 @@ public class GuestController {
         } else if (product instanceof Food) {
             Food f = (Food) product;
             desc.append("Gramaj: ").append(f.getWeight()).append("g\n");
-            if (f.isVegetarian()) desc.append("🌱 Vegetarian\n");
+            if (f.isVegetarian()) desc.append("Vegetarian\n");
         } else if (product instanceof Drink) {
             Drink d = (Drink) product;
             desc.append("Volum: ").append(d.getVolume()).append("l\n");
@@ -84,7 +86,11 @@ public class GuestController {
         boolean onlyVeg = view.getVegCheckBox().isSelected();
         String typeSelection = view.getTypeFilter().getValue();
 
+        double minPrice = parsePrice(view.getMinPriceField().getText(), 0.0);
+        double maxPrice = parsePrice(view.getMaxPriceField().getText(), Double.MAX_VALUE);
+
         Stream<Product> stream = allProducts.stream();
+
 
         if (!searchText.isEmpty()) {
             stream = stream.filter(p -> p.getName().toLowerCase().contains(searchText));
@@ -100,7 +106,20 @@ public class GuestController {
             stream = stream.filter(p -> p instanceof Drink);
         }
 
+        stream = stream.filter(p -> p.getPrice() >= minPrice && p.getPrice() <= maxPrice);
+
         List<Product> filteredList = stream.collect(Collectors.toList());
-        view.getMenuTable().setItems(observableArrayList(filteredList));
+        view.getMenuTable().setItems(FXCollections.observableArrayList(filteredList));
+    }
+
+    private double parsePrice(String text, double defaultValue) {
+        if (text == null || text.trim().isEmpty()) {
+            return defaultValue;
+        }
+        try {
+            return Double.parseDouble(text);
+        } catch (NumberFormatException e) {
+            return defaultValue; // Dacă scrie prostii ("abc"), ignorăm filtrul
+        }
     }
 }

@@ -6,6 +6,7 @@ import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
@@ -17,6 +18,8 @@ public class GuestView extends BorderPane {
     private TextField searchField;
     private CheckBox vegCheckBox;
     private ComboBox<String> typeFilter;
+    private TextField minPriceField;
+    private TextField maxPriceField;
     private Button backButton;
 
     private Label detailNameLabel;
@@ -55,12 +58,21 @@ public class GuestView extends BorderPane {
         typeFilter = new ComboBox<>();
         typeFilter.getItems().addAll("Toate", "Mâncare", "Băutură");
         typeFilter.getSelectionModel().selectFirst();
+        Label priceLabel = new Label("Interval Preț (RON):");
+
+        minPriceField = new TextField();
+        minPriceField.setPromptText("Min");
+        maxPriceField = new TextField();
+        maxPriceField.setPromptText("Max");
+        HBox priceBox = new HBox(5, minPriceField, maxPriceField);
+
         backButton = new Button("<- Ieșire (Logout)");
 
         leftBox.getChildren().addAll(filterLabel, new Separator(),
                 new Label("Căutare:"), searchField,
                 new Label("Preferințe:"), vegCheckBox,
                 new Label("Tip:"), typeFilter,
+                priceLabel, priceBox,
                 new Separator(), backButton);
         this.setLeft(leftBox);
     }
@@ -102,6 +114,8 @@ public class GuestView extends BorderPane {
     public TextField getSearchField() { return searchField; }
     public CheckBox getVegCheckBox() { return vegCheckBox; }
     public ComboBox<String> getTypeFilter() { return typeFilter; }
+    public TextField getMinPriceField() { return minPriceField; }
+    public TextField getMaxPriceField() { return maxPriceField; }
     public Button getBackButton() { return backButton; }
 
     public Label getDetailNameLabel() { return detailNameLabel; }
