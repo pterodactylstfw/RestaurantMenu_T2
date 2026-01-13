@@ -9,6 +9,7 @@ import javafx.scene.layout.GridPane;
 import javafx.stage.FileChooser;
 import unitbv.mip.config.ConfigManager;
 import unitbv.mip.mapper.OrderMapper;
+import unitbv.mip.mapper.ProductMapper;
 import unitbv.mip.model.*;
 import unitbv.mip.repository.OrderRepository;
 import unitbv.mip.repository.ProductRepository;
@@ -53,12 +54,15 @@ public class AdminController {
 
     private void refreshLightData() {
         view.getStaffTable().setItems(FXCollections.observableArrayList(userRepository.findAllStaff()));
-        view.getMenuTable().setItems(FXCollections.observableArrayList(productRepository.getAllProducts()));
+        List<ProductViewModel> productModels = productRepository.getAllProducts().stream()
+                .map(ProductMapper::toModel)
+                .collect(Collectors.toList());
+
+        view.getMenuTable().setItems(FXCollections.observableArrayList(productModels));
     }
 
     private void refreshAllData() {
-        view.getStaffTable().setItems(FXCollections.observableArrayList(userRepository.findAllStaff()));
-        view.getMenuTable().setItems(FXCollections.observableArrayList(productRepository.getAllProducts()));
+        refreshLightData();
         loadHistoryAsync();
     }
 
@@ -301,21 +305,33 @@ public class AdminController {
             showAlert("Succes", "Produsul a fost adăugat în meniu!");
         });
     }
-    
+
     private void deleteProduct() {
-        Product selected = view.getMenuTable().getSelectionModel().getSelectedItem();
+        ProductViewModel selected = view.getMenuTable().getSelectionModel().getSelectedItem();
         if (selected != null) {
-            productRepository.delete(selected);
-            refreshAllData();
+            Optional<Product> productOpt = productRepository.findById(selected.getId());
+            productOpt.ifPresent(product -> {
+                productRepository.delete(product);
+                refreshAllData();
+            });
         }
     }
 
     private void editProduct() {
-        Product selected = view.getMenuTable().getSelectionModel().getSelectedItem();
-        if (selected == null) {
+        ProductViewModel selectedViewModel = view.getMenuTable().getSelectionModel().getSelectedItem();
+        if (selectedViewModel == null) {
             showAlert("Atenție", "Selectează un produs din tabel pentru a-l edita.");
             return;
         }
+
+        Optional<Product> productOpt = productRepository.findById(selectedViewModel.getId());
+
+        if (productOpt.isEmpty()) {
+            showAlert("Eroare", "Produsul nu mai există în baza de date.");
+            return;
+        }
+
+        Product selected = productOpt.get();
 
         Dialog<Product> dialog = new Dialog<>();
         dialog.setTitle("Editare Produs");
