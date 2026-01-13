@@ -1,41 +1,27 @@
 package unitbv.mip.view;
 
-import javafx.beans.property.SimpleStringProperty;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
-import javafx.scene.control.cell.PropertyValueFactory;
-import unitbv.mip.model.Drink;
-import unitbv.mip.model.Food;
-import unitbv.mip.model.Product;
+import unitbv.mip.model.ProductViewModel;
 
-public class MenuTableView extends TableView<Product> {
+public class MenuTableView extends TableView<ProductViewModel> {
 
     public MenuTableView() {
-        TableColumn<Product, String> nameColumn = new TableColumn<>("Nume Produs");
-        nameColumn.setCellValueFactory(new PropertyValueFactory<>("name"));
+        TableColumn<ProductViewModel, String> nameColumn = new TableColumn<>("Nume Produs");
+        nameColumn.setCellValueFactory(cell -> cell.getValue().nameProperty());
         nameColumn.setMinWidth(150);
 
-        TableColumn<Product, Double> priceColumn = new TableColumn<>("Pret");
-        priceColumn.setCellValueFactory(new PropertyValueFactory<>("price"));
+        TableColumn<ProductViewModel, Double> priceColumn = new TableColumn<>("Pret");
+        priceColumn.setCellValueFactory(cell -> cell.getValue().priceProperty().asObject());
         priceColumn.setMinWidth(80);
 
-        TableColumn<Product, String> categoryColumn = new TableColumn<>("Categorie");
-        categoryColumn.setCellValueFactory(cellData ->
-                new SimpleStringProperty(cellData.getValue().getCategory().toString()));
+        TableColumn<ProductViewModel, String> categoryColumn = new TableColumn<>("Categorie");
+        categoryColumn.setCellValueFactory(cell -> cell.getValue().categoryProperty());
 
-        TableColumn<Product, String> detailsColumn = new TableColumn<>("Detalii");
-        detailsColumn.setCellValueFactory(cellData -> {
-            Product p = cellData.getValue();
-            if (p instanceof Food) {
-                return new SimpleStringProperty(((Food) p).getWeight() + "g");
-            } else if (p instanceof Drink) {
-                return new SimpleStringProperty(((Drink) p).getVolume() + "l");
-            }
-            return new SimpleStringProperty("-");
-        });
+        TableColumn<ProductViewModel, String> detailsColumn = new TableColumn<>("Detalii");
+        detailsColumn.setCellValueFactory(cell -> cell.getValue().detailsProperty());
 
         this.getColumns().addAll(nameColumn, priceColumn, categoryColumn, detailsColumn);
-
         this.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
     }
 }

@@ -4,6 +4,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import unitbv.mip.mapper.ProductMapper;
 import unitbv.mip.model.*;
 import unitbv.mip.repository.OrderRepository;
 import unitbv.mip.repository.ProductRepository;
@@ -17,6 +18,7 @@ import unitbv.mip.view.StaffView;
 import unitbv.mip.view.TableSelectionView;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class StaffController {
     private final ProductRepository productRepository;
@@ -25,6 +27,8 @@ public class StaffController {
 
     private int currentTableNumber;
     private final ObservableList<OrderItem> currentOrderItems = FXCollections.observableArrayList();
+
+    private List<Product> allProducts;
 
     public StaffController() {
         this.productRepository = new ProductRepository();
@@ -71,14 +75,28 @@ public class StaffController {
         StaffView orderView = new StaffView();
         orderView.getTableLabel().setText("Masa " + tableNumber);
 
-        orderView.getMenuTable().setItems(FXCollections.observableArrayList(productRepository.getAllProducts()));
+        allProducts = productRepository.getAllProducts();
+        List<ProductViewModel> viewModels = allProducts.stream()
+                .map(ProductMapper::toModel)
+                .collect(Collectors.toList());
+
+        orderView.getMenuTable().setItems(FXCollections.observableArrayList(viewModels));
+
         orderView.getCartTable().setItems(currentOrderItems);
 
         orderView.getAddButton().setOnAction(e -> {
-            Product selected = orderView.getMenuTable().getSelectionModel().getSelectedItem();
-            if (selected != null) {
-                addToCart(selected, orderView.getQuantity());
-                updateTotal(orderView);
+            ProductViewModel selectedVM = orderView.getMenuTable().getSelectionModel().getSelectedItem();
+
+            if (selectedVM != null) {
+                Product selectedProduct = allProducts.stream()
+                        .filter(p -> p.getId().equals(selectedVM.getId()))
+                        .findFirst()
+                        .orElse(null);
+
+                if (selectedProduct != null) {
+                    addToCart(selectedProduct, orderView.getQuantity());
+                    updateTotal(orderView);
+                }
             }
         });
 

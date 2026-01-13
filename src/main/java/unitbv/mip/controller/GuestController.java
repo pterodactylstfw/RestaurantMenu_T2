@@ -1,10 +1,8 @@
 package unitbv.mip.controller;
 
 import javafx.collections.FXCollections;
-import unitbv.mip.model.Drink;
-import unitbv.mip.model.Food;
-import unitbv.mip.model.Pizza;
-import unitbv.mip.model.Product;
+import unitbv.mip.mapper.ProductMapper;
+import unitbv.mip.model.*;
 import unitbv.mip.repository.ProductRepository;
 import unitbv.mip.utils.SceneManager;
 import unitbv.mip.view.GuestView;
@@ -32,7 +30,10 @@ public class GuestController {
     private void attachListeners() {
         view.getMenuTable().getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
             if (newSelection != null) {
-                updateDetailsPanel(newSelection);
+                allProducts.stream()
+                        .filter(p -> p.getId().equals(newSelection.getId()))
+                        .findFirst()
+                        .ifPresent(this::updateDetailsPanel);
             }
         });
         view.getSearchField().textProperty().addListener((obs, old, nev) -> applyFilters());
@@ -78,7 +79,11 @@ public class GuestController {
     private void loadData() {
         allProducts = productRepository.getAllProducts();
 
-        view.getMenuTable().setItems(observableArrayList(allProducts));
+        List<ProductViewModel> models = allProducts.stream()
+                .map(ProductMapper::toModel)
+                .collect(Collectors.toList());
+
+        view.getMenuTable().setItems(FXCollections.observableArrayList(models));
     }
 
     private void applyFilters() {
@@ -108,8 +113,13 @@ public class GuestController {
 
         stream = stream.filter(p -> p.getPrice() >= minPrice && p.getPrice() <= maxPrice);
 
-        List<Product> filteredList = stream.collect(Collectors.toList());
-        view.getMenuTable().setItems(FXCollections.observableArrayList(filteredList));
+        List<Product> filteredEntities = stream.collect(Collectors.toList());
+
+        List<ProductViewModel> filteredModels = filteredEntities.stream()
+                .map(ProductMapper::toModel)
+                .collect(Collectors.toList());
+
+        view.getMenuTable().setItems(FXCollections.observableArrayList(filteredModels));
     }
 
     private double parsePrice(String text, double defaultValue) {

@@ -72,6 +72,15 @@ public class ProductRepository {
         }
     }
 
+    public Optional<Product> findById(Long id) {
+        EntityManager em = getEntityManager();
+        try {
+            return Optional.ofNullable(em.find(Product.class, id));
+        } finally {
+            em.close();
+        }
+    }
+
     public void updateProduct(Product product) {
         EntityManager em = getEntityManager();
         try {
