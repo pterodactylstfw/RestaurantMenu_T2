@@ -14,4 +14,5 @@ module unitbv.mip {
     opens unitbv.mip.config to com.fasterxml.jackson.databind;
 
     exports unitbv.mip;
+    opens unitbv.mip.mapper to com.fasterxml.jackson.databind, javafx.base, org.hibernate.orm.core;
 }

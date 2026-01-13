@@ -9,6 +9,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import unitbv.mip.model.Order;
+import unitbv.mip.model.OrderViewModel;
 import unitbv.mip.model.User;
 
 public class AdminView extends StackPane {
@@ -23,13 +24,13 @@ public class AdminView extends StackPane {
     private Button addStaffButton, deleteStaffButton;
 
     private MenuTableView menuTable;
-    private Button deleteProductButton, editProductButton;
+    private Button addProductButton, deleteProductButton, editProductButton;
     private Button importJsonButton, exportJsonButton;
 
     private CheckBox happyHourCheck, mealDealCheck, partyPackCheck;
     private Button saveOffersButton;
 
-    private TableView<Order> globalHistoryTable;
+    private TableView<OrderViewModel> globalHistoryTable;
     private Button refreshHistoryButton;
 
     private Button logoutButton;
@@ -102,12 +103,13 @@ public class AdminView extends StackPane {
 
         HBox controls = new HBox(10);
         controls.setPadding(new Insets(10));
+        addProductButton = new Button("Adaugă Produs Nou");
         deleteProductButton = new Button("Șterge Produs Selectat");
         editProductButton = new Button("Editează Produs");
         importJsonButton = new Button("Import JSON");
         exportJsonButton = new Button("Export JSON");
 
-        controls.getChildren().addAll(editProductButton, deleteProductButton, new Separator(), importJsonButton, exportJsonButton);
+        controls.getChildren().addAll(addProductButton, new Separator(), editProductButton, deleteProductButton, new Separator(), importJsonButton, exportJsonButton);
         content.setBottom(controls);
 
         tab.setContent(content);
@@ -141,13 +143,22 @@ public class AdminView extends StackPane {
         refreshHistoryButton = new Button("Reîncarcă Istoric");
         topBar.getChildren().addAll(logoutButton, new Separator(), refreshHistoryButton);
 
+        // modif tabel istoric global
         globalHistoryTable = new TableView<>();
-        TableColumn<Order, Long> idCol = new TableColumn<>("ID");
-        idCol.setCellValueFactory(new PropertyValueFactory<>("id"));
-        TableColumn<Order, Double> totalCol = new TableColumn<>("Total (RON)");
-        totalCol.setCellValueFactory(new PropertyValueFactory<>("totalAmount"));
 
-        globalHistoryTable.getColumns().addAll(idCol, totalCol);
+        TableColumn<unitbv.mip.model.OrderViewModel, Number> idCol = new TableColumn<>("ID");
+        idCol.setCellValueFactory(cell -> cell.getValue().idProperty());
+
+        TableColumn<unitbv.mip.model.OrderViewModel, String> waiterCol = new TableColumn<>("Ospătar");
+        waiterCol.setCellValueFactory(cell -> cell.getValue().waiterNameProperty());
+
+        TableColumn<unitbv.mip.model.OrderViewModel, String> totalCol = new TableColumn<>("Total");
+        totalCol.setCellValueFactory(cell -> cell.getValue().totalAmountProperty());
+
+        TableColumn<unitbv.mip.model.OrderViewModel, String> statusCol = new TableColumn<>("Status");
+        statusCol.setCellValueFactory(cell -> cell.getValue().statusProperty());
+
+        globalHistoryTable.getColumns().addAll(idCol, waiterCol, totalCol, statusCol);
         globalHistoryTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
         content.getChildren().addAll(topBar, globalHistoryTable);
@@ -163,6 +174,7 @@ public class AdminView extends StackPane {
     public Button getDeleteStaffButton() { return deleteStaffButton; }
 
     public MenuTableView getMenuTable() { return menuTable; }
+    public Button getAddProductButton() { return addProductButton; }
     public Button getDeleteProductButton() { return deleteProductButton; }
     public Button getEditProductButton() { return editProductButton; }
     public Button getImportJsonButton() { return importJsonButton; }
@@ -173,6 +185,6 @@ public class AdminView extends StackPane {
     public CheckBox getPartyPackCheck() { return partyPackCheck; }
     public Button getSaveOffersButton() { return saveOffersButton; }
 
-    public TableView<Order> getGlobalHistoryTable() { return globalHistoryTable; }
+    public TableView<OrderViewModel> getGlobalHistoryTable() { return globalHistoryTable; }
     public Button getLogoutButton() { return logoutButton; }
 }

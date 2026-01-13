@@ -8,10 +8,8 @@ import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
 import javafx.stage.FileChooser;
 import unitbv.mip.config.ConfigManager;
-import unitbv.mip.model.Order;
-import unitbv.mip.model.Product;
-import unitbv.mip.model.Role;
-import unitbv.mip.model.User;
+import unitbv.mip.mapper.OrderMapper;
+import unitbv.mip.model.*;
 import unitbv.mip.repository.OrderRepository;
 import unitbv.mip.repository.ProductRepository;
 import unitbv.mip.repository.UserRepository;
@@ -28,6 +26,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 public class AdminController {
 
@@ -60,34 +59,34 @@ public class AdminController {
     private void refreshAllData() {
         view.getStaffTable().setItems(FXCollections.observableArrayList(userRepository.findAllStaff()));
         view.getMenuTable().setItems(FXCollections.observableArrayList(productRepository.getAllProducts()));
-        view.getGlobalHistoryTable().setItems(FXCollections.observableArrayList(orderRepository.findAll()));
+        loadHistoryAsync();
     }
 
     private void attachListeners() {
-        // --- STAFF LISTENERS ---
+        // staff
         view.getAddStaffButton().setOnAction(e -> addStaff());
         view.getDeleteStaffButton().setOnAction(e -> deleteStaff());
 
-        // Listener pentru dublu-click pe tabelul de staff pentru EDITARE
-        view.getStaffTable().setOnMouseClicked(event -> {
+        view.getStaffTable().setOnMouseClicked(event -> { // double click pentru edit
             if (event.getClickCount() == 2 && view.getStaffTable().getSelectionModel().getSelectedItem() != null) {
                 editStaff();
             }
         });
 
-        // --- HISTORY LISTENERS ---
+        // istoric
         view.getRefreshHistoryButton().setOnAction(e -> loadHistoryAsync());
 
-        // --- MENU LISTENERS ---
+        // meniu
+        view.getAddProductButton().setOnAction(e -> addProduct());
         view.getDeleteProductButton().setOnAction(e -> deleteProduct());
         view.getEditProductButton().setOnAction(e -> editProduct());
         view.getExportJsonButton().setOnAction(e -> exportJson());
         view.getImportJsonButton().setOnAction(e -> importJsonAsync());
 
-        // --- OFFERS LISTENERS ---
+        // oferte
         view.getSaveOffersButton().setOnAction(e -> saveOffers());
 
-        // --- GENERAL LISTENERS ---
+        // logout
         view.getLogoutButton().setOnAction(e -> {
             new AuthService().logout();
             LoginView loginView = new LoginView();
@@ -96,7 +95,7 @@ public class AdminController {
         });
     }
 
-    // --- METODE STAFF (USER) ---
+    // metode staff
 
     private void addStaff() {
         String user = view.getUsernameField().getText();
@@ -156,8 +155,6 @@ public class AdminController {
         Optional<User> result = dialog.showAndWait();
 
         result.ifPresent(user -> {
-            // Asigură-te că ai metoda update în UserRepository (folosind em.merge)
-            // Dacă nu o ai, adaug-o similar cu updateProduct
             userRepository.update(user);
             refreshAllData();
             showAlert("Succes", "Datele angajatului au fost actualizate!");
@@ -178,8 +175,7 @@ public class AdminController {
 
         Optional<ButtonType> result = alert.showAndWait();
         if (result.isPresent() && result.get() == ButtonType.OK) {
-            // --- MODIFICARE PENTRU ȘTERGERE CASCADE ---
-            // 1. Găsim și ștergem comenzile ospătarului manual pentru a evita eroarea de Foreign Key
+            // stergem comenzile asociate ospătarului înainte de a-l șterge ( cascade)
             List<Order> allOrders = orderRepository.findAll();
             for (Order o : allOrders) {
                 if (o.getWaiter() != null && o.getWaiter().getId().equals(selected.getId())) {
@@ -187,15 +183,125 @@ public class AdminController {
                 }
             }
 
-            // 2. Acum putem șterge ospătarul
+            // acum sterg ospatar
             userRepository.delete(selected);
             refreshAllData();
             showAlert("Succes", "Angajatul și istoricul său au fost șterse.");
         }
     }
 
-    // --- METODE PRODUS (MENU) ---
+    // metode meniu
 
+    private void addProduct() {
+        Dialog<Product> dialog = new Dialog<>();
+        dialog.setTitle("Adăugare Produs Nou");
+        dialog.setHeaderText("Completează detaliile noului produs");
+
+        ButtonType saveButtonType = new ButtonType("Adaugă", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(saveButtonType, ButtonType.CANCEL);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new javafx.geometry.Insets(20, 150, 10, 10));
+
+        TextField nameField = new TextField();
+        nameField.setPromptText("Nume produs");
+
+        TextField priceField = new TextField();
+        priceField.setPromptText("Preț (ex: 25.5)");
+
+        ComboBox<unitbv.mip.model.Category> categoryBox = new ComboBox<>();
+        categoryBox.getItems().setAll(unitbv.mip.model.Category.values());
+        categoryBox.setPromptText("Categorie");
+
+        ComboBox<String> typeBox = new ComboBox<>();
+        typeBox.getItems().addAll("Mâncare (Food)", "Băutură (Drink)");
+        typeBox.setValue("Mâncare (Food)"); // Default
+
+        Label extraLabel = new Label("Gramaj (g):");
+        TextField extraField = new TextField();
+        extraField.setPromptText("ex: 350");
+
+        typeBox.valueProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal.contains("Mâncare")) {
+                extraLabel.setText("Gramaj (g):");
+                extraField.setPromptText("ex: 350");
+            } else {
+                extraLabel.setText("Volum (l):");
+                extraField.setPromptText("ex: 0.5");
+            }
+        });
+
+        grid.add(new Label("Tip:"), 0, 0);
+        grid.add(typeBox, 1, 0);
+        grid.add(new Label("Nume:"), 0, 1);
+        grid.add(nameField, 1, 1);
+        grid.add(new Label("Preț:"), 0, 2);
+        grid.add(priceField, 1, 2);
+        grid.add(new Label("Categorie:"), 0, 3);
+        grid.add(categoryBox, 1, 3);
+        grid.add(extraLabel, 0, 4);
+        grid.add(extraField, 1, 4);
+
+        dialog.getDialogPane().setContent(grid);
+
+        dialog.setResultConverter(dialogButton -> {
+            if (dialogButton == saveButtonType) {
+                try {
+                    String name = nameField.getText();
+                    double price = Double.parseDouble(priceField.getText());
+                    unitbv.mip.model.Category category = categoryBox.getValue();
+                    String type = typeBox.getValue();
+                    double extra = Double.parseDouble(extraField.getText());
+
+                    if (name.isEmpty() || category == null) {
+                        throw new IllegalArgumentException("Toate câmpurile sunt obligatorii!");
+                    }
+
+                    Product newProduct;
+                    if (type.contains("Mâncare")) {
+                        Food food = new Food();
+                        food.setName(name);
+                        food.setPrice(price);
+                        food.setCategory(category);
+                        food.setWeight(extra);
+                        food.setVegetarian(false);
+                        newProduct = food;
+                    } else {
+                        Drink drink = new Drink();
+                        drink.setName(name);
+                        drink.setPrice(price);
+                        drink.setCategory(category);
+                        drink.setVolume(extra);
+                        drink.setAlcoholic(false);
+                        newProduct = drink;
+                    }
+
+                    newProduct.setActive(true);
+
+                    return newProduct;
+
+                } catch (NumberFormatException e) {
+                    showAlert("Eroare", "Prețul și Gramajul/Volumul trebuie să fie numere valide!");
+                    return null;
+                } catch (Exception e) {
+                    showAlert("Eroare", "Date invalide: " + e.getMessage());
+                    return null;
+                }
+            }
+            return null;
+        });
+
+        Optional<Product> result = dialog.showAndWait();
+
+        result.ifPresent(product -> {
+            productRepository.addProduct(product);
+            refreshAllData();
+            showAlert("Succes", "Produsul a fost adăugat în meniu!");
+        });
+    }
+    
     private void deleteProduct() {
         Product selected = view.getMenuTable().getSelectionModel().getSelectedItem();
         if (selected != null) {
@@ -234,12 +340,12 @@ public class AdminController {
         TextField extraField = new TextField();
         Label extraLabel = new Label();
 
-        if (selected instanceof unitbv.mip.model.Food) {
+        if (selected instanceof Food) {
             extraLabel.setText("Gramaj (g):");
-            extraField.setText(String.valueOf(((unitbv.mip.model.Food) selected).getWeight()));
-        } else if (selected instanceof unitbv.mip.model.Drink) {
+            extraField.setText(String.valueOf(((Food) selected).getWeight()));
+        } else if (selected instanceof Drink) {
             extraLabel.setText("Volum (l):");
-            extraField.setText(String.valueOf(((unitbv.mip.model.Drink) selected).getVolume()));
+            extraField.setText(String.valueOf(((Drink) selected).getVolume()));
         }
 
         grid.add(extraLabel, 0, 2);
@@ -255,10 +361,10 @@ public class AdminController {
 
                     double extraValue = Double.parseDouble(extraField.getText());
 
-                    if (selected instanceof unitbv.mip.model.Food) {
-                        ((unitbv.mip.model.Food) selected).setWeight(extraValue);
-                    } else if (selected instanceof unitbv.mip.model.Drink) {
-                        ((unitbv.mip.model.Drink) selected).setVolume(extraValue);
+                    if (selected instanceof Food) {
+                        ((Food) selected).setWeight(extraValue);
+                    } else if (selected instanceof Drink) {
+                        ((Drink) selected).setVolume(extraValue);
                     }
 
                     return selected;
@@ -354,16 +460,23 @@ public class AdminController {
         executorService.submit(task);
     }
 
-    // --- METODE ISTORIC ---
+    // metode istoric
 
     private void loadHistoryAsync() {
         view.setLoading(true);
 
-        Task<List<Order>> task = new Task<>() {
+        Task<List<OrderViewModel>> task = new Task<>() {
             @Override
-            protected List<Order> call() throws Exception {
-                Thread.sleep(1500);
-                return orderRepository.findAll();
+            protected List<OrderViewModel> call() throws Exception {
+                Thread.sleep(1000); // simulare 1 sec
+
+                // luam datele brute din baza de date
+                List<Order> rawOrders = orderRepository.findAll();
+
+                // folosesc OrderMapper pentru a converti fiecare Order în OrderViewModel
+                return rawOrders.stream()
+                        .map(OrderMapper::toModel)
+                        .collect(Collectors.toList());
             }
         };
 
@@ -381,7 +494,7 @@ public class AdminController {
         executorService.submit(task);
     }
 
-    // --- METODE OFERTE ---
+    // metode oferte
 
     private void saveOffers() {
         DiscountStrategies.HAPPY_HOUR_ACTIVE = view.getHappyHourCheck().isSelected();
