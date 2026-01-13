@@ -20,6 +20,9 @@ public sealed abstract class Product permits Food, Drink {
 
     Long id;
 
+    @Column(columnDefinition = "boolean default true")
+    private boolean active = true;
+
     private StringProperty name;
     private DoubleProperty price;
     private ObjectProperty<Category> category;
@@ -56,6 +59,9 @@ public sealed abstract class Product permits Food, Drink {
     public Category getCategory() { return category.get(); }
     public ObjectProperty<Category> categoryProperty() { return category; }
     public void setCategory(Category category) { this.category.set(category); }
+
+    public boolean isActive() { return active; }
+    public void setActive(boolean active) { this.active = active; }
 
     @Override
     public String toString() {

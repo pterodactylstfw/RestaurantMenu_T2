@@ -18,6 +18,7 @@ public class ProductRepository {
         EntityManager entityManager = getEntityManager();
         try {
             entityManager.getTransaction().begin();
+            product.setActive(true);
             entityManager.persist(product);
             entityManager.getTransaction().commit();
         } catch (Exception e) {
@@ -34,7 +35,7 @@ public class ProductRepository {
         EntityManager entityManager = getEntityManager();
         try {
             return entityManager
-                    .createQuery("SELECT p FROM Product p", Product.class)
+                    .createQuery("SELECT p FROM Product p WHERE p.active = true", Product.class)
                     .getResultList();
         } finally {
             entityManager.close();
@@ -46,7 +47,10 @@ public class ProductRepository {
         try {
             em.getTransaction().begin();
             Product managedProduct = em.merge(product);
-            em.remove(managedProduct);
+
+            managedProduct.setActive(false);
+
+            em.merge(managedProduct);
             em.getTransaction().commit();
         } catch (Exception e) {
             em.getTransaction().rollback();
@@ -59,7 +63,7 @@ public class ProductRepository {
     public Optional<Product> findByName(String name) {
         EntityManager em = getEntityManager();
         try {
-            return em.createQuery("SELECT p FROM Product p WHERE LOWER(p.name) = :name", Product.class)
+            return em.createQuery("SELECT p FROM Product p WHERE LOWER(p.name) = :name AND p.active = true", Product.class)
                     .setParameter("name", name.toLowerCase())
                     .getResultStream()
                     .findFirst();
